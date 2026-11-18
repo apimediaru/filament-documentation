@@ -1,0 +1,26 @@
+{
+    "name": "apimediaru/filament-documentation",
+    "description": "Markdown customer guides from installed packages in Filament.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "ext-intl": "*",
+        "laravel/framework": "^13.0",
+        "filament/filament": "^5.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^11.0",
+        "larastan/larastan": "^3.9",
+        "laravel/pint": "^1.29"
+    },
+    "autoload": {"psr-4": {"ApiMedia\\Documentation\\": "src/"}},
+    "autoload-dev": {"psr-4": {"ApiMedia\\Documentation\\Tests\\": "tests/"}},
+    "extra": {"laravel": {"providers": ["ApiMedia\\Documentation\\DocumentationServiceProvider"]}},
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse",
+        "lint": "pint --test"
+    },
+    "config": {"sort-packages": true}
+}
