@@ -49,7 +49,14 @@ final class DocumentationPlugin implements Plugin
             return null;
         }
         $user = $panel->auth()->user();
-        if ($user === null || ($user instanceof FilamentUser && ! $user->canAccessPanel($panel))) {
+        if ($user === null) {
+            return null;
+        }
+
+        $canAccessPanel = $user instanceof FilamentUser
+            ? $user->canAccessPanel($panel)
+            : config('app.env') === 'local';
+        if (! $canAccessPanel) {
             return null;
         }
         $plugin = $panel->getPlugin('documentation');

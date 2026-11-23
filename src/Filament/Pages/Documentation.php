@@ -6,7 +6,7 @@ use ApiMedia\Documentation\DocumentationPlugin;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
-use Livewire\Attributes\Url;
+use Livewire\Attributes\Locked;
 
 class Documentation extends Page
 {
@@ -14,10 +14,10 @@ class Documentation extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
-    #[Url]
+    #[Locked]
     public ?string $source = null;
 
-    #[Url]
+    #[Locked]
     public ?string $chapter = null;
 
     public static function getNavigationLabel(): string
@@ -32,7 +32,14 @@ class Documentation extends Page
 
     public function mount(): void
     {
-        if ($this->source !== null || $this->chapter !== null) {
+        // Chapter links load the page, so read identifiers without Livewire's JSON decoding.
+        $query = request()->query();
+        if (array_key_exists('source', $query) || array_key_exists('chapter', $query)) {
+            $source = $query['source'] ?? null;
+            $chapter = $query['chapter'] ?? null;
+            $this->source = is_string($source) ? $source : '';
+            $this->chapter = is_string($chapter) ? $chapter : '';
+
             return;
         }
         foreach ($this->plugin()->sources() as $source) {

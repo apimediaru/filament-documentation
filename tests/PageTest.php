@@ -8,7 +8,9 @@ use ApiMedia\Documentation\Filament\Pages\Documentation;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Foundation\Auth\User;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 
 class PageTest extends TestCase
@@ -21,9 +23,7 @@ class PageTest extends TestCase
         $this->root = sys_get_temp_dir().'/documentation-page-'.bin2hex(random_bytes(8));
         mkdir($this->root.'/docs/ru', 0777, true);
         mkdir($this->root.'/docs/en', 0777, true);
-        file_put_contents($this->root.'/composer.json', json_encode(['extra' => ['apimediaru' => ['documentation' => [
-            'id' => 'site', 'title' => ['ru' => 'Сайт', 'en' => 'Site'], 'path' => 'docs',
-        ]]]], JSON_THROW_ON_ERROR));
+        $this->declareSource('site');
         file_put_contents($this->root.'/docs/ru/01-intro.md', "# Введение\n\nТекст инструкции");
         $this->app->instance(DocumentationCatalog::class, new DocumentationCatalog($this->root, []));
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -37,6 +37,13 @@ class PageTest extends TestCase
         parent::tearDown();
     }
 
+    private function declareSource(string $id): void
+    {
+        file_put_contents($this->root.'/composer.json', json_encode(['extra' => ['apimediaru' => ['documentation' => [
+            'id' => $id, 'title' => ['ru' => 'Сайт', 'en' => 'Site'], 'path' => 'docs',
+        ]]]], JSON_THROW_ON_ERROR));
+    }
+
     #[Test]
     public function opens_first_chapter_and_generates_shareable_links(): void
     {
@@ -45,6 +52,32 @@ class PageTest extends TestCase
         $url = DocumentationPlugin::url('site', 'intro');
         $this->assertStringContainsString('source=site', $url);
         $this->assertStringContainsString('chapter=intro', $url);
+    }
+
+    public static function scalar_like_slugs(): iterable
+    {
+        yield ['true'];
+        yield ['false'];
+        yield ['1e3'];
+    }
+
+    #[Test]
+    #[DataProvider('scalar_like_slugs')]
+    public function generated_links_preserve_scalar_like_source_and_chapter_names(string $slug): void
+    {
+        $this->declareSource($slug);
+        file_put_contents($this->root.'/docs/ru/02-'.$slug.'.md', "# Глава\n\nТекст выбранной главы");
+
+        $url = DocumentationPlugin::url($slug, $slug);
+        $this->assertNotNull($url);
+        $this->get($url)->assertOk()->assertSee('Текст выбранной главы');
+    }
+
+    #[Test]
+    public function malformed_chapter_parameter_shows_the_missing_state(): void
+    {
+        $this->get(Documentation::getUrl(['chapter' => ['intro']]))
+            ->assertOk()->assertSee('Глава не найдена')->assertDontSee('Текст инструкции');
     }
 
     #[Test]
@@ -107,6 +140,21 @@ class PageTest extends TestCase
         $this->actingAs(new Reader(['id' => 2, 'name' => 'Denied', 'allowed' => false]));
         $this->assertNull(DocumentationPlugin::url('site', 'intro'));
         $this->get(Documentation::getUrl())->assertForbidden();
+    }
+
+    #[Test]
+    public function links_follow_filaments_local_exception_for_users_without_the_panel_contract(): void
+    {
+        $this->actingAs((new User)->forceFill(['id' => 3, 'name' => 'Reader']));
+        $url = Documentation::getUrl(['source' => 'site', 'chapter' => 'intro']);
+
+        config(['app.env' => 'local']);
+        $this->assertSame($url, DocumentationPlugin::url('site', 'intro', 'admin'));
+        $this->get($url)->assertOk();
+
+        config(['app.env' => 'production']);
+        $this->get($url)->assertForbidden();
+        $this->assertNull(DocumentationPlugin::url('site', 'intro', 'admin'));
     }
 
     #[Test]
